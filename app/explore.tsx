@@ -160,6 +160,25 @@ export default function ExploreScreen() {
           </View>
         </Animated.ScrollView>
 
+        {/* Animated pathway line behind the dot */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 47, // center under the moving dot (36 + 12 - 1)
+            width: 2,
+            backgroundColor: '#60A5FA',
+            zIndex: 15,
+            top: DOT_START,
+            // height grows from 0 to DOT_END - DOT_START as you scroll
+            height: scrollY.interpolate({
+              inputRange: [0, effectiveMaxScroll],
+              outputRange: [0, Math.max(0, DOT_END - DOT_START)],
+              extrapolate: 'clamp',
+            }),
+          }}
+        />
+
         {/* Moving dot (explicit styles so it's always visible) */}
         <Animated.View
           pointerEvents="none"
