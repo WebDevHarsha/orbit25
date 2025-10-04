@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons'
-import { FlashList } from '@shopify/flash-list'
 import { Image } from 'expo-image'
-import React, { useState } from 'react'
-import { Pressable, SafeAreaView, Text, View } from 'react-native'
+import React, { useRef, useState } from 'react'
+import { Animated, Dimensions, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import timelineData from '../assets/json/timeline.json'
+
+const { height } = Dimensions.get('window')
 
 interface TimelineItem {
   date: string
@@ -12,7 +14,7 @@ interface TimelineItem {
   image: string
 }
 
-// Image mapping using require() - the correct approach for React Native
+// Static image mapping
 const imageMap: { [key: string]: any } = {
   'img1.jpg': require('../assets/images/img1.jpg'),
   'img2.jpg': require('../assets/images/img2.jpg'),
@@ -50,103 +52,141 @@ const formatDate = (dateString: string) => {
   })
 }
 
-const TimelineItemComponent = React.memo(
-  ({ item, index }: { item: TimelineItem; index: number }) => {
-    const [expanded, setExpanded] = useState(false)
-    const [imageError, setImageError] = useState(false)
+const ITEM_HEIGHT = 320 // estimated height per item (adjust if needed)
 
-    const imageSource = imageMap[item.image]
+const TimelineItemComponent = ({ item }: { item: TimelineItem }) => {
+  const [imageError, setImageError] = useState(false)
 
-    return (
-      <View className="px-6 mb-6">
-        <View className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-          <View className="h-48 overflow-hidden bg-gray-800">
-            {imageSource && !imageError ? (
-              <Image
-                source={imageSource}
-                style={{ width: '100%', height: '100%' }}
-                contentFit="cover"
-                placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-                onError={(error) => {
-                  console.log(`Image error for ${item.image}:`, error)
-                  setImageError(true)
-                }}
-              />
-            ) : (
-              <View className="w-full h-full bg-gray-700 justify-center items-center">
-                <Ionicons name="image-outline" size={48} color="#9CA3AF" />
-                <Text className="text-gray-400 text-sm mt-2">
-                  {imageSource ? 'Loading failed' : 'Image not found'}
-                </Text>
-                <Text className="text-gray-500 text-xs mt-1">{item.image}</Text>
-              </View>
-            )}
-          </View>
+  const imageSource = imageMap[item.image]
 
-          <View className="p-5">
-            <Text className="text-gray-400 text-sm mb-2">
-              {formatDate(item.date)}
-            </Text>
+  return (
+    <View className="mb-8 relative px-6" style={{ minHeight: ITEM_HEIGHT }}>
+      <View className="flex-row">
+        <View style={{ width: 56 }} className="items-center">
+          {/* spacer for the single moving dot; per-item markers removed */}
+        </View>
 
-            <Text className="text-white text-lg font-semibold mb-3 leading-6">
-              {item.title}
-            </Text>
-
-            <Text
-              className="text-gray-300 text-sm leading-6"
-              numberOfLines={expanded ? undefined : 3}
-            >
-              {item.description}
-            </Text>
-
-            {item.description.length > 150 && (
-              <Pressable
-                onPress={() => setExpanded(!expanded)}
-                className="mt-3"
-              >
-                <View className="flex-row items-center">
-                  <Text className="text-white text-sm font-medium mr-2">
-                    {expanded ? 'Show Less' : 'Read More'}
+        <View className="flex-1">
+          <View className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+            <View className="h-48 overflow-hidden bg-gray-800">
+              {imageSource && !imageError ? (
+                <Image
+                  source={imageSource}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="cover"
+                  placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <View className="w-full h-full bg-gray-700 justify-center items-center">
+                  <Ionicons name="image-outline" size={48} color="#9CA3AF" />
+                  <Text className="text-gray-400 text-sm mt-2">
+                    {imageSource ? 'Loading failed' : 'Image not found'}
                   </Text>
-                  <Ionicons
-                    name={expanded ? 'chevron-up' : 'chevron-down'}
-                    size={16}
-                    color="#FFFFFF"
-                  />
+                  <Text className="text-gray-500 text-xs mt-1">
+                    {item.image}
+                  </Text>
                 </View>
-              </Pressable>
-            )}
+              )}
+            </View>
+
+            <View className="p-5">
+              <Text className="text-gray-400 text-sm mb-2">
+                {formatDate(item.date)}
+              </Text>
+
+              <Text className="text-white text-lg font-semibold mb-3 leading-6">
+                {item.title}
+              </Text>
+
+              <Text className="text-gray-300 text-sm leading-6">
+                {item.description}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
-    )
-  }
-)
+    </View>
+  )
+}
 
 export default function ExploreScreen() {
+  const scrollY = useRef(new Animated.Value(0)).current
+
+  const contentHeight = Math.max(1, timelineData.length * ITEM_HEIGHT)
+  const maxScroll = Math.max(1, contentHeight - height)
+
+  // SPEED_FACTOR: >1 = faster (dot reaches end sooner), <1 = slower
+  const SPEED_FACTOR = 0.47
+  const effectiveMaxScroll = Math.max(1, maxScroll / SPEED_FACTOR)
+
+  // Dot travel range (px)
+  const DOT_START = 40
+  const DOT_END = Math.max(40, height - 300)
+
   return (
     <SafeAreaView className="flex-1 bg-black">
-      <View className="px-6 pt-6 pb-4">
-        <View className="flex-row items-center mb-2">
-          <Ionicons name="time" size={24} color="#FFFFFF" />
-          <Text className="text-white text-2xl font-semibold ml-3">
-            ISS Timeline
-          </Text>
-        </View>
+      <View className="px-6  pb-4">
         <Text className="text-gray-400 text-base leading-6">
-          Key milestones in the International Space Station's journey
+          Key milestones in the ISS's journey
         </Text>
       </View>
 
-      <FlashList
-        data={timelineData as TimelineItem[]}
-        renderItem={({ item, index }) => (
-          <TimelineItemComponent item={item} index={index} />
-        )}
-        keyExtractor={(item, index) => `timeline-${index}-${item.date}`}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
-      />
+      <View className="flex-1 relative">
+        {/* Continuous timeline line */}
+        <View className="absolute left-10 top-0 bottom-0 w-1 bg-blue-700 opacity-60 z-10" />
+
+        <Animated.ScrollView
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingVertical: 20, paddingBottom: 80 }}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            {
+              useNativeDriver: false,
+            }
+          )}
+          scrollEventThrottle={16}
+        >
+          {timelineData.map((item: TimelineItem, index: number) => (
+            <TimelineItemComponent key={index} item={item} />
+          ))}
+
+          <View className="items-center mt-12 mb-8 px-6">
+            <View className="w-8 h-8 bg-blue-500 rounded-full border-4 border-gray-900 shadow-lg" />
+            <Text className="text-base text-gray-500 mt-4 font-medium">
+              Timeline Complete
+            </Text>
+          </View>
+        </Animated.ScrollView>
+
+        {/* Moving dot (explicit styles so it's always visible) */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: 'absolute',
+              left: 36,
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              backgroundColor: '#60A5FA', // blue-400
+              borderWidth: 2,
+              borderColor: '#000',
+              zIndex: 20,
+              elevation: 6,
+            },
+            {
+              top: scrollY.interpolate({
+                inputRange: [0, effectiveMaxScroll],
+                // use DOT_START/DOT_END and the SPEED_FACTOR via effectiveMaxScroll
+                outputRange: [DOT_START, DOT_END],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+        />
+      </View>
     </SafeAreaView>
   )
 }
